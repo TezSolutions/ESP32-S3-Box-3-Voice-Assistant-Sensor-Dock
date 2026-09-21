@@ -3,7 +3,7 @@ substitutions:
   name: sentinel-box3
   friendly_name: Sentinel S3 Box 3
   micro_wake_word_model: hey_jarvis  # options: okay_nabu, hey_jarvis, alexa
-  noise_suppression_level: '3'
+  noise_suppression_level: '2'
 
   # ----- Fill these in with your device's values (or !secret refs from secrets.yaml)
   ota_password: !secret ota_password
@@ -227,22 +227,8 @@ media_player:
 micro_wake_word:
   models:
     - model: hey_jarvis
-      probability_cutoff: 80%
+      probability_cutoff: 75%
   on_wake_word_detected:
-    - if:
-        condition:
-          lambda: return id(mem_va_speaker_mode).state != "${VA_SPEAKER_MUTE}";
-        then:
-          - media_player.play_media: ${wakeword_sound}
-          - wait_until:
-              condition:
-                not:
-                  media_player.is_idle
-              timeout: 2sec
-          - wait_until:
-              condition:
-                media_player.is_idle
-              timeout: 2sec
     - if:
         condition:
           - lambda: return id(app_state) == ${APP_STATE_SCREEN_SAVER};
