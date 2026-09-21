@@ -84,6 +84,9 @@ logger:
   logs:
     micro_wake_word: DEBUG
     voice_assistant: DEBUG
+    remote_receiver: WARN
+    remote.pronto: WARN
+    remote.raw: WARN
     sensor: WARN
     binary_sensor: WARN
     esp-idf: WARN
@@ -227,7 +230,9 @@ media_player:
 micro_wake_word:
   models:
     - model: hey_jarvis
+      id: mww_jarvis
       probability_cutoff: 75%
+      internal: true
   on_wake_word_detected:
     - if:
         condition:
@@ -245,7 +250,7 @@ voice_assistant:
   media_player: speaker_media_player
   noise_suppression_level: ${noise_suppression_level}
   auto_gain: 31dBFS
-  volume_multiplier: 4.0
+  volume_multiplier: 2.0
   on_client_connected:
     - lambda: ESP_LOGD("voice_assistant_on", "on_client_connected");
     - if:
@@ -255,7 +260,9 @@ voice_assistant:
           - lambda: id(va).set_use_wake_word(true);
           - voice_assistant.start_continuous
         else:
-          - lambda: id(va).set_use_wake_word(false);
+          - lambda: |-
+              id(va).set_use_wake_word(false);
+              id(mww_jarvis).enable();
           - micro_wake_word.start
     - script.execute:
         id: change_va_state
