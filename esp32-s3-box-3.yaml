@@ -2025,8 +2025,8 @@ display:
       - id: screen_saver_page
         lambda: |-
           it.fill(Color::BLACK);
-          it.strftime(160, 90, id(font_large), white, TextAlign::CENTER, "%H:%M");
-          it.strftime(160, 136, id(font_small), blue_light, TextAlign::CENTER, "%A, %d %b");
+          it.strftime(160, 90, id(font_large), white, TextAlign::CENTER, "%H:%M", id(ha_time).now());
+          it.strftime(160, 136, id(font_small), blue_light, TextAlign::CENTER, "%A, %d %b", id(ha_time).now());
           if (id(s3temp).has_state()) {
             it.printf(160, 162, id(font_small), grey, TextAlign::CENTER, "Room Temp: %.1f°C", id(s3temp).state);
           }
