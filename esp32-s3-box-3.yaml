@@ -10,9 +10,9 @@ substitutions:
   encryption_key: !secret encryption_key
 
   # ----- Sound files served from Home Assistant /local (HTTP: HTTPS adds 2+s lag)
-  wakeword_sound: 'http://192.168.0.137:8123/local/sounds/wakeword.mp3'
-  success_sound: 'http://192.168.0.137:8123/local/sounds/success.mp3'
-  error_sound: 'http://192.168.0.137:8123/local/sounds/error.mp3'
+  wakeword_sound: 'http://192.168.1.101:8123/local/sounds/wakeword.mp3'
+  success_sound: 'http://192.168.1.101:8123/local/sounds/success.mp3'
+  error_sound: 'http://192.168.1.101:8123/local/sounds/error.mp3'
 
   # ----- don't mess with anything below this line (except, optionally, the TODOs) -----
   VERSION: '1.3.2-sentinel.1'
