@@ -669,7 +669,9 @@ color:
   - id: white
     hex: 'ffffff'
   - id: purple
-    hex: '73264D'
+    hex: 'A855F7'
+  - id: grey
+    hex: '64748B'
   - id: grey_dark
     hex: '202020'
 
@@ -1338,10 +1340,10 @@ binary_sensor:
   - id: ts_va_toggle
     platform: touchscreen
     internal: true
-    x_min: 90
-    x_max: 230
-    y_min: 95
-    y_max: 205
+    x_min: 75
+    x_max: 245
+    y_min: 55
+    y_max: 195
     on_press:
       then:
         - if:
@@ -1732,7 +1734,7 @@ display:
         lambda: |-
           int y = 0;
           int x = 15;
-          int xinc = 65;
+          int xinc = 60;
 
           it.fill(Color::BLACK);
           
@@ -1740,10 +1742,11 @@ display:
           if (!id(nav_lock)) {
             it.print(5, (240 - 5), id(font_icon_large), TextAlign::BOTTOM_LEFT, "\U000F004F");
             it.print((320 - 5), (240 - 5), id(font_icon_large), TextAlign::BOTTOM_RIGHT, "\U000F0056");
+            it.print((320 / 2), (240 - 12), id(font_small), blue_light, TextAlign::CENTER, "•  ○  ○  ○  ○");
           }
 
-          it.print((320 / 2), 0, id(font_large), yellow, TextAlign::TOP_CENTER, "- Status -");
-          y += 42;
+          it.print((320 / 2), 2, id(font_small), yellow, TextAlign::TOP_CENTER, "SENTINEL SATELLITE");
+          y = 20;
 
           if (network::is_connected()) {
             it.print(x, y, id(font_icon_small), lime, "\U000F16BD");
@@ -1759,40 +1762,15 @@ display:
           }
           x += xinc;
 
-          x += 3; // oddly spaced icon
+          x += 3; // battery icon
           if (id(battery_voltage).has_state ()) {
               if (id(battery_voltage).state <= 2.7) {
-                  // Replace battery, less than 10%
-                  it.print(x, y, id(font_icon_small), "\U000F10CD");
-              } else if (id(battery_percent).state >= 98) {
-                  // # mdi-battery
-                  it.print(x, y, id(font_icon_small), green, "\U000F0079");
-              } else if (id(battery_percent).state >= 90) {
-                  // # mdi-battery-90
-                  it.print(x, y, id(font_icon_small), green, "\U000F0082");
-              } else if (id(battery_percent).state >= 80) {
-                  // # mdi-battery-80
-                  it.print(x, y, id(font_icon_small), green, "\U000F0081");
+                  it.print(x, y, id(font_icon_small), red, "\U000F10CD");
               } else if (id(battery_percent).state >= 70) {
-                  // # mdi-battery-70
-                  it.print(x, y, id(font_icon_small), green, "\U000F0080");
-              } else if (id(battery_percent).state >= 60) {
-                  // # mdi-battery-60
-                  it.print(x, y, id(font_icon_small), green, "\U000F007F");
-              } else if (id(battery_percent).state >= 50) {
-                  // # mdi-battery-50
-                  it.print(x, y, id(font_icon_small), amber, "\U000F007E");
-              } else if (id(battery_percent).state >= 40) {
-                  // # mdi-battery-40
-                  it.print(x, y, id(font_icon_small), amber, "\U000F007D");
+                  it.print(x, y, id(font_icon_small), green, "\U000F0079");
               } else if (id(battery_percent).state >= 30) {
-                  // # mdi-battery-30
-                  it.print(x, y, id(font_icon_small), red, "\U000F007C");
-              } else if (id(battery_percent).state >= 20) {
-                  // # mdi-battery-20
-                  it.print(x, y, id(font_icon_small), red, "\U000F007B");
-              } else if (id(battery_percent).state >= 10) {
-                  // # mdi-battery-10
+                  it.print(x, y, id(font_icon_small), amber, "\U000F007D");
+              } else {
                   it.print(x, y, id(font_icon_small), red, "\U000F007A");
               }
           }
@@ -1801,50 +1779,50 @@ display:
           if (id(enable_ir).state) {
             it.print(x, y, id(font_icon_small), yellow, "\U000F0330");
           } else {
-            it.print(x, y, id(font_icon_small), blue_dark, "\U000F032E");
+            it.print(x, y, id(font_icon_small), grey, "\U000F032E");
           }
           x += xinc;
           
-          x -= 10; // oddly spaced icon
+          x -= 10;
           it.print(x, y, id(font_icon_small), blue, "\U000F050F");
-          it.printf(x + 22, y + 41, id(font_small), black, TextAlign::BOTTOM_CENTER, "%.f", id(s3temp).state);
-          it.printf(x + 23, y + 41, id(font_small), black, TextAlign::BOTTOM_CENTER, "%.f", id(s3temp).state);
+          if (id(s3temp).has_state()) {
+            it.printf(x + 22, y + 41, id(font_small), white, TextAlign::BOTTOM_CENTER, "%.0f°C", id(s3temp).state);
+          }
 
-          // VA status image
-          y = (it.get_height() / 2) - 30;
+          // Cute Robot Mascot Centered with Tez Logo (160x130)
           if (id(mute_error)) {
-            it.image((it.get_width() / 2), y, id(error_img), ImageAlign::TOP_CENTER);
-            y += 105;
-            it.print((it.get_width() / 2), y, id(font_small), red, TextAlign::TOP_CENTER, "HW mute has been pressed.");
-            y += 15;
-            it.print((it.get_width() / 2), y, id(font_small), red, TextAlign::TOP_CENTER, "Reboot device to restore VA.");
+            it.image((it.get_width() / 2), 120, id(error_img), ImageAlign::CENTER);
+            it.print((it.get_width() / 2), 194, id(font_small), red, TextAlign::CENTER, "HARDWARE MUTED");
           } else {
             switch (id(va_state)) {
               case ${VA_STATE_NOT_READY}:
-                it.image((it.get_width() / 2), y, id(notready_img), ImageAlign::TOP_CENTER);
+                it.image((it.get_width() / 2), 120, id(notready_img), ImageAlign::CENTER);
+                it.print((it.get_width() / 2), 194, id(font_small), grey, TextAlign::CENTER, "CONNECTING...");
                 break;
               case ${VA_STATE_IDLE}:
-                it.image((it.get_width() / 2), y, id(idle_img), ImageAlign::TOP_CENTER);
+                it.image((it.get_width() / 2), 120, id(idle_img), ImageAlign::CENTER);
+                if (id(mem_va_speaker_mode).state == "${VA_SPEAKER_MUTE}") {
+                  it.print((it.get_width() / 2), 194, id(font_small), amber, TextAlign::CENTER, "MUTED  |  TAP TO WAKE");
+                } else {
+                  it.print((it.get_width() / 2), 194, id(font_small), blue_light, TextAlign::CENTER, "READY  |  \"HEY JARVIS\"");
+                }
                 break;
               case ${VA_STATE_LISTENING}:
-                it.image((it.get_width() / 2), y, id(listening_img), ImageAlign::TOP_CENTER);
+                it.image((it.get_width() / 2), 120, id(listening_img), ImageAlign::CENTER);
+                it.print((it.get_width() / 2), 194, id(font_small), blue, TextAlign::CENTER, "LISTENING...");
                 break;
               case ${VA_STATE_THINKING}:
-                it.image((it.get_width() / 2), y, id(thinking_img), ImageAlign::TOP_CENTER);
+                it.image((it.get_width() / 2), 120, id(thinking_img), ImageAlign::CENTER);
+                it.print((it.get_width() / 2), 194, id(font_small), purple, TextAlign::CENTER, "PROCESSING...");
                 break;
               case ${VA_STATE_REPLYING}:
-                it.image((it.get_width() / 2), y, id(replying_img), ImageAlign::TOP_CENTER);
+                it.image((it.get_width() / 2), 120, id(replying_img), ImageAlign::CENTER);
+                it.print((it.get_width() / 2), 194, id(font_small), green, TextAlign::CENTER, "SPEAKING...");
                 break;
               case ${VA_STATE_ERROR}:
-                it.image((it.get_width() / 2), y, id(error_img), ImageAlign::TOP_CENTER);
+                it.image((it.get_width() / 2), 120, id(error_img), ImageAlign::CENTER);
+                it.print((it.get_width() / 2), 194, id(font_small), red, TextAlign::CENTER, "ERROR");
                 break;
-            }
-            
-            y += 68;
-            if (id(mem_va_speaker_mode).state == "${VA_SPEAKER_MUTE}") {
-              it.print((it.get_width() / 2) + 1, y, id(font_icon_tiny), red, TextAlign::TOP_CENTER, "\U000F00AD");
-            } else if (id(mem_va_speaker_mode).state == "${VA_SPEAKER_BEEP}") {
-              it.print((it.get_width() / 2) + 1, y, id(font_icon_tiny), yellow, TextAlign::TOP_CENTER, "\U000F009C");
             }
           }
 
@@ -1856,13 +1834,14 @@ display:
           int btnRadius = 24;
 
           it.fill(Color::BLACK);
-          it.print((it.get_width() / 2), 0, id(font_large), yellow, TextAlign::TOP_CENTER, "- IR Learning -");
+          it.print((it.get_width() / 2), 2, id(font_small), yellow, TextAlign::TOP_CENTER, "IR LEARNING");
           y += 46;
 
           // # print nav buttons
           if (!id(nav_lock)) {
             it.print(5, (240 - 5), id(font_icon_large), TextAlign::BOTTOM_LEFT, "\U000F004F");
             it.print((320 - 5), (240 - 5), id(font_icon_large), TextAlign::BOTTOM_RIGHT, "\U000F0056");
+            it.print((320 / 2), (240 - 12), id(font_small), blue_light, TextAlign::CENTER, "○  •  ○  ○  ○");
           }
 
           if (!id(enable_ir).state) {
@@ -1910,12 +1889,13 @@ display:
       - id: ir_blast_page
         lambda: |-
           it.fill(Color::BLACK);
-          it.print((it.get_width() / 2), 0, id(font_large), yellow, TextAlign::TOP_CENTER, "- IR Blast -");
+          it.print((it.get_width() / 2), 2, id(font_small), yellow, TextAlign::TOP_CENTER, "IR TRANSMITTER");
 
           // # print nav buttons
           if (!id(nav_lock)) {
             it.print(5, (240 - 5), id(font_icon_large), TextAlign::BOTTOM_LEFT, "\U000F004F");
             it.print((320 - 5), (240 - 5), id(font_icon_large), TextAlign::BOTTOM_RIGHT, "\U000F0056");
+            it.print((320 / 2), (240 - 12), id(font_small), blue_light, TextAlign::CENTER, "○  ○  •  ○  ○");
           }
 
           if (!id(enable_ir).state) {
@@ -1943,39 +1923,39 @@ display:
       - id: voice_assistant_page
         lambda: |-
           it.fill(Color::BLACK);
-          it.print((it.get_width() / 2), 0, id(font_large), yellow, TextAlign::TOP_CENTER, "- Voice Assistant -");
+          it.print((it.get_width() / 2), 2, id(font_small), yellow, TextAlign::TOP_CENTER, "VOICE ASSISTANT");
 
           // # print nav buttons
           if (!id(nav_lock)) {
             it.print(5, (240 - 5), id(font_icon_large), TextAlign::BOTTOM_LEFT, "\U000F004F");
             it.print((320 - 5), (240 - 5), id(font_icon_large), TextAlign::BOTTOM_RIGHT, "\U000F0056");
+            it.print((320 / 2), (240 - 12), id(font_small), blue_light, TextAlign::CENTER, "○  ○  ○  •  ○");
           }
 
           int x = 15;
-          int y = 46;
+          int y = 32;
 
-          it.printf(x, y, id(font_small), white, "Wake word engine: %s", id(mem_wake_word_engine_location).state.c_str());
+          it.printf(x, y, id(font_small), white, "Engine: %s   |   Speaker: %s", 
+                    id(mem_wake_word_engine_location).state.c_str(),
+                    id(mem_va_speaker_mode).state.c_str());
 
-          y += 15;
-          it.printf(x, y, id(font_small), white, "Speaker mode: %s", id(mem_va_speaker_mode).state.c_str());
-
-          y += 15;
-          std::string stateStr = "Unknown";
+          y += 20;
+          std::string stateStr = "Idle";
           switch (id(va_state)) {
             case ${VA_STATE_IDLE}:
-              stateStr = "Idle";
+              stateStr = "Idle (Ready)";
               break;
             case ${VA_STATE_LISTENING}:
-              stateStr = "Listening";
+              stateStr = "Listening...";
               break;
             case ${VA_STATE_THINKING}:
-              stateStr = "Thinking";
+              stateStr = "Thinking...";
               break;
             case ${VA_STATE_NOT_READY}:
               stateStr = "Not Ready";
               break;
             case ${VA_STATE_REPLYING}:
-              stateStr = "Replying";
+              stateStr = "Replying...";
               break;
             case ${VA_STATE_ERROR}:
               stateStr = "Error";
@@ -1984,36 +1964,37 @@ display:
               stateStr = "Muted";
               break;
           }
-          it.printf(x, y, id(font_small), white, "Current state: %s", stateStr.c_str());
+          it.printf(x, y, id(font_small), blue_light, "Current state: %s", stateStr.c_str());
 
           if (id(va_request).state.length() > 0) {
-            y += 15;
-            it.print(x, y, id(font_small), white, "Last request:");
-            y += 15;
+            y += 20;
+            it.print(x, y, id(font_small), yellow, "Last request:");
+            y += 16;
             it.printf(x, y, id(font_small), white, "%s", id(va_request).state.c_str());
           }
 
           if (id(va_response).state.length() > 0) {
-            y += 15;
-            it.print(x, y, id(font_small), white, "Last response:");
-            y += 15;
+            y += 20;
+            it.print(x, y, id(font_small), green, "Last response:");
+            y += 16;
             it.printf(x, y, id(font_small), white, "%s", id(va_response).state.c_str());
           }
 
           if (id(mute_error)) {
-            y += 15;
+            y += 20;
             it.print(x, y, id(font_small), red, "HW mute error. Reboot device to restore VA.");
           }
 
       - id: settings_page
         lambda: |-
           it.fill(Color::BLACK);
-          it.print((it.get_width() / 2), 0, id(font_large), yellow, TextAlign::TOP_CENTER, "- Settings -");
+          it.print((it.get_width() / 2), 2, id(font_small), yellow, TextAlign::TOP_CENTER, "SETTINGS");
 
           // # print nav buttons
           if (!id(nav_lock)) {
             it.print(5, (240 - 5), id(font_icon_large), TextAlign::BOTTOM_LEFT, "\U000F004F");
             it.print((320 - 5), (240 - 5), id(font_icon_large), TextAlign::BOTTOM_RIGHT, "\U000F0056");
+            it.print((320 / 2), (240 - 12), id(font_small), blue_light, TextAlign::CENTER, "○  ○  ○  ○  •");
           }
 
           int x = 15;
@@ -2043,27 +2024,12 @@ display:
 
       - id: screen_saver_page
         lambda: |-
-          std::string output;
-          switch (id(ha_time).now().timestamp % 10) {
-            case 0:
-            case 1:
-            case 2:
-            case 3:
-              return;
-            case 4:
-            case 5:
-              output = "Z";
-              break;
-            case 6:
-            case 7:
-              output = "ZZ";
-              break;
-            case 8:
-            case 9:
-              output = "ZZZ";
-              break;
+          it.fill(Color::BLACK);
+          it.strftime(160, 90, id(font_large), white, TextAlign::CENTER, "%H:%M");
+          it.strftime(160, 136, id(font_small), blue_light, TextAlign::CENTER, "%A, %d %b");
+          if (id(s3temp).has_state()) {
+            it.printf(160, 162, id(font_small), grey, TextAlign::CENTER, "Room Temp: %.1f°C", id(s3temp).state);
           }
-          it.print(320 / 2 - 52, 240 / 2, id(font_extra_large), grey_dark, TextAlign::CENTER_LEFT, output.c_str());
 
       - id: touchscreen_error_page
         lambda: |-
