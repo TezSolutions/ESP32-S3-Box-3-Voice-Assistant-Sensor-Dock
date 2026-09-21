@@ -1,7 +1,7 @@
 # Search for "TODO" and adjust as necessary
 substitutions:
-  name: s3box3-voice-asst-sd
-  friendly_name: S3 Box 3 Voice Assistant SD
+  name: sentinel-box3
+  friendly_name: Sentinel S3 Box 3
   micro_wake_word_model: hey_jarvis  # options: okay_nabu, hey_jarvis, alexa
   noise_suppression_level: '3'
 
@@ -15,7 +15,7 @@ substitutions:
   error_sound: 'http://192.168.100.10:8123/local/sounds/error.mp3'
 
   # ----- don't mess with anything below this line (except, optionally, the TODOs) -----
-  VERSION: '1.3.2'
+  VERSION: '1.3.2-sentinel.1'
   ALLOWED_CHARACTERS: " !#%\"'()+,-./0123456789:;<>?@ABCDEFGHIJKLMNOPQRSTUVWYZ[]_abcdefghijklmnopqrstuvwxyz{|}°²³µ¿ÁÂÄÅÉÖÚßàáâãäåæçèéêëìíîðñòóôõöøùúûüýþāăąćčďĐđēėęěğĮįıļľŁłńňőřśšťũūůűųźŻżŽžơưșțΆΈΌΐΑΒΓΔΕΖΗΘΚΜΝΠΡΣΤΥΦάέήίαβγδεζηθικλμνξοπρςστυφχψωϊόύώАБВГДЕЖЗИКЛМНОПРСТУХЦЧШЪЭЮЯабвгдежзийклмнопрстуфхцчшщъыьэюяёђєіїјљњћ"
   
   VA_IN_HOME_ASSISTANT: "In Home Assistant"
@@ -57,7 +57,7 @@ esphome:
       - display.page.show: loading_page
       - component.update: s3_box_lcd
   project:
-    name: "AlmostInteractive.VoiceAssistantSensorDock"
+    name: "TezSolutions.SentinelBox3"
     version: ${VERSION}
 
 esp32:
@@ -557,7 +557,7 @@ font:
     id: font_extra_large
     size: 60
     glyphs: [Z]
-  - file: "https://github.com/AlmostInteractive/ESP32-S3-Box-3-Voice-Assistant-Sensor-Dock/raw/master/fonts/materialdesignicons-webfont.ttf"
+  - file: "fonts/materialdesignicons-webfont.ttf"
     id: font_icon_tiny
     size: 30
     glyphs: [
@@ -568,7 +568,7 @@ font:
       "\U000F0375",#minus-box
       "\U000F0416",#plus-box
     ]
-  - file: "https://github.com/AlmostInteractive/ESP32-S3-Box-3-Voice-Assistant-Sensor-Dock/raw/master/fonts/materialdesignicons-webfont.ttf"
+  - file: "fonts/materialdesignicons-webfont.ttf"
     id: font_icon_small
     size: 45
     glyphs: [
@@ -607,7 +607,7 @@ font:
       "\U000F00AD",#block-helper
       "\U000F01F2",#emoticon-outline
       ]
-  - file: "https://github.com/AlmostInteractive/ESP32-S3-Box-3-Voice-Assistant-Sensor-Dock/raw/master/fonts/materialdesignicons-webfont.ttf"
+  - file: "fonts/materialdesignicons-webfont.ttf"
     id: font_icon_large
     size: 65
     glyphs: [
@@ -616,54 +616,54 @@ font:
       ]
 
 image:
-  - file: "https://raw.githubusercontent.com/AlmostInteractive/ESP32-S3-Box-3-Voice-Assistant-Sensor-Dock/master/images/notready.png"
+  - file: "images/notready.png"
     id: notready_img
     type: RGB
     transparency: alpha_channel
-  - file: "https://raw.githubusercontent.com/AlmostInteractive/ESP32-S3-Box-3-Voice-Assistant-Sensor-Dock/master/images/error.png"
+  - file: "images/error.png"
     id: error_img
     type: RGB
     transparency: alpha_channel
-  - file: "https://raw.githubusercontent.com/AlmostInteractive/ESP32-S3-Box-3-Voice-Assistant-Sensor-Dock/master/images/idle.png"
+  - file: "images/idle.png"
     id: idle_img
     type: RGB
     transparency: alpha_channel
-  - file: "https://raw.githubusercontent.com/AlmostInteractive/ESP32-S3-Box-3-Voice-Assistant-Sensor-Dock/master/images/listening.png"
+  - file: "images/listening.png"
     id: listening_img
     type: RGB
     transparency: alpha_channel
-  - file: "https://raw.githubusercontent.com/AlmostInteractive/ESP32-S3-Box-3-Voice-Assistant-Sensor-Dock/master/images/thinking.png"
+  - file: "images/thinking.png"
     id: thinking_img
     type: RGB
     transparency: alpha_channel
-  - file: "https://raw.githubusercontent.com/AlmostInteractive/ESP32-S3-Box-3-Voice-Assistant-Sensor-Dock/master/images/replying.png"
+  - file: "images/replying.png"
     id: replying_img
     type: RGB
     transparency: alpha_channel
-  - file: "https://raw.githubusercontent.com/AlmostInteractive/ESP32-S3-Box-3-Voice-Assistant-Sensor-Dock/master/images/loading.png"
+  - file: "images/loading.png"
     id: loading_img
     type: RGB
     transparency: alpha_channel
 
 color:
   - id: green
-    hex: '75D15F'
+    hex: '22C55E'
   - id: red
-    hex: 'FF3131'
+    hex: 'EF4444'
   - id: blue
-    hex: '47B7E9'
+    hex: '38BDF8'
   - id: blue_light
-    hex: 'CFE2F3'
+    hex: 'BAE6FD'
   - id: blue_dark
-    hex: '085296'
+    hex: '1C5FA8'
   - id: amber
     hex: 'FBAB35'
   - id: lime
-    hex: '20FC30'
+    hex: '4ADE80'
   - id: pink
     hex: 'D92BBC'
   - id: yellow
-    hex: 'FFC000'
+    hex: '38BDF8'
   - id: black
     hex: '000000'
   - id: white
@@ -1334,6 +1334,27 @@ binary_sensor:
                   call.set_value(sleep);
                   call.perform();
               - component.update: s3_box_lcd
+  # Touchscreen VA toggle (tap the VA state picture on the status page)
+  - id: ts_va_toggle
+    platform: touchscreen
+    internal: true
+    x_min: 90
+    x_max: 230
+    y_min: 95
+    y_max: 205
+    on_press:
+      then:
+        - if:
+            condition:
+              lambda: 'return !id(nav_lock) && id(app_state) == ${APP_STATE_STATUS} && !id(mute_error);'
+            then:
+              - if:
+                  condition:
+                    voice_assistant.is_running:
+                  then:
+                    - voice_assistant.stop:
+                  else:
+                    - voice_assistant.start:
   # Touchscreen mute toggle
   - id: settings_mute
     platform: touchscreen
