@@ -51,11 +51,17 @@ esphome:
   on_boot:
     priority: 600
     then:
+      - switch.turn_on: speaker_enable
       - light.turn_on: 
           id: led
           brightness: 100%
       - display.page.show: loading_page
       - component.update: s3_box_lcd
+      - media_player.volume_set:
+          id: speaker_media_player
+          volume: 80%
+      - lambda: |-
+          id(mww_jarvis).enable();
   project:
     name: "TezSolutions.SentinelBox3"
     version: ${VERSION}
@@ -211,6 +217,8 @@ media_player:
   - id: speaker_media_player
     platform: speaker
     name: "S3 Box 3 Media Player"
+    volume_min: 0.5
+    volume_max: 0.9
     announcement_pipeline:
       speaker: box_speaker
       format: FLAC
@@ -412,6 +420,15 @@ touchscreen:
   interrupt_pin: GPIO3
 
 switch:
+  - platform: gpio
+    name: "Speaker Enable"
+    id: speaker_enable
+    pin:
+      number: GPIO46
+      ignore_strapping_warning: true
+    restore_mode: RESTORE_DEFAULT_ON
+    entity_category: config
+
   - id: enable_ir
     platform: gpio
     name: "IR Power"
