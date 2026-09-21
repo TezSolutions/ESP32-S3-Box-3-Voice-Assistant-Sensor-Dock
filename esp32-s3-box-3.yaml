@@ -82,7 +82,8 @@ logger:
   hardware_uart: USB_SERIAL_JTAG
   level: DEBUG
   logs:
-    micro_wake_word: INFO
+    micro_wake_word: DEBUG
+    voice_assistant: DEBUG
     sensor: WARN
     binary_sensor: WARN
     esp-idf: WARN
@@ -224,9 +225,9 @@ media_player:
       - lambda: ESP_LOGD("media_player", "on_announcement");
 
 micro_wake_word:
-  id: mww
   models:
-    - ${micro_wake_word_model}
+    - model: hey_jarvis
+      probability_cutoff: 80%
   on_wake_word_detected:
     - if:
         condition:
@@ -256,7 +257,6 @@ voice_assistant:
   id: va
   microphone: box_mic
   media_player: speaker_media_player
-  micro_wake_word: mww
   noise_suppression_level: ${noise_suppression_level}
   auto_gain: 31dBFS
   volume_multiplier: 4.0
