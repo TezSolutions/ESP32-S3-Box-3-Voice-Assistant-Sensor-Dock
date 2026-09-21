@@ -82,7 +82,7 @@ logger:
   hardware_uart: USB_SERIAL_JTAG
   level: DEBUG
   logs:
-    micro_wake_word: WARN
+    micro_wake_word: INFO
     sensor: WARN
     binary_sensor: WARN
     esp-idf: WARN
@@ -224,6 +224,7 @@ media_player:
       - lambda: ESP_LOGD("media_player", "on_announcement");
 
 micro_wake_word:
+  id: mww
   models:
     - ${micro_wake_word_model}
   on_wake_word_detected:
@@ -255,6 +256,7 @@ voice_assistant:
   id: va
   microphone: box_mic
   media_player: speaker_media_player
+  micro_wake_word: mww
   noise_suppression_level: ${noise_suppression_level}
   auto_gain: 31dBFS
   volume_multiplier: 4.0
@@ -267,6 +269,7 @@ voice_assistant:
           - lambda: id(va).set_use_wake_word(true);
           - voice_assistant.start_continuous
         else:
+          - lambda: id(va).set_use_wake_word(false);
           - micro_wake_word.start
     - script.execute:
         id: change_va_state
@@ -330,6 +333,12 @@ voice_assistant:
           - script.execute:
               id: change_va_state
               nextState: ${VA_STATE_IDLE}
+          - if:
+              condition:
+                lambda: return id(mem_wake_word_engine_location).state == "${VA_ON_DEVICE}";
+              then:
+                - delay: 500ms
+                - micro_wake_word.start
   on_stt_end:
     - lambda: ESP_LOGD("voice_assistant_on", "on_stt_end");
     - text_sensor.template.publish:
@@ -434,9 +443,9 @@ select:
     optimistic: true
     restore_value: true
     options:
-      - ${VA_IN_HOME_ASSISTANT}
       - ${VA_ON_DEVICE}
-    initial_option: ${VA_IN_HOME_ASSISTANT}
+      - ${VA_IN_HOME_ASSISTANT}
+    initial_option: ${VA_ON_DEVICE}
     on_value:
       - if:
           condition:
@@ -1742,7 +1751,11 @@ display:
           if (!id(nav_lock)) {
             it.print(5, (240 - 5), id(font_icon_large), TextAlign::BOTTOM_LEFT, "\U000F004F");
             it.print((320 - 5), (240 - 5), id(font_icon_large), TextAlign::BOTTOM_RIGHT, "\U000F0056");
-            it.print((320 / 2), (240 - 12), id(font_small), blue_light, TextAlign::CENTER, "•  ○  ○  ○  ○");
+            for (int i = 0; i < 5; i++) {
+              int dot_x = 160 - 24 + (i * 12);
+              if (i == 0) it.filled_circle(dot_x, 228, 3, blue_light);
+              else it.circle(dot_x, 228, 2, grey);
+            }
           }
 
           it.print((320 / 2), 2, id(font_small), yellow, TextAlign::TOP_CENTER, "SENTINEL SATELLITE");
@@ -1841,7 +1854,11 @@ display:
           if (!id(nav_lock)) {
             it.print(5, (240 - 5), id(font_icon_large), TextAlign::BOTTOM_LEFT, "\U000F004F");
             it.print((320 - 5), (240 - 5), id(font_icon_large), TextAlign::BOTTOM_RIGHT, "\U000F0056");
-            it.print((320 / 2), (240 - 12), id(font_small), blue_light, TextAlign::CENTER, "○  •  ○  ○  ○");
+            for (int i = 0; i < 5; i++) {
+              int dot_x = 160 - 24 + (i * 12);
+              if (i == 1) it.filled_circle(dot_x, 228, 3, blue_light);
+              else it.circle(dot_x, 228, 2, grey);
+            }
           }
 
           if (!id(enable_ir).state) {
@@ -1895,7 +1912,11 @@ display:
           if (!id(nav_lock)) {
             it.print(5, (240 - 5), id(font_icon_large), TextAlign::BOTTOM_LEFT, "\U000F004F");
             it.print((320 - 5), (240 - 5), id(font_icon_large), TextAlign::BOTTOM_RIGHT, "\U000F0056");
-            it.print((320 / 2), (240 - 12), id(font_small), blue_light, TextAlign::CENTER, "○  ○  •  ○  ○");
+            for (int i = 0; i < 5; i++) {
+              int dot_x = 160 - 24 + (i * 12);
+              if (i == 2) it.filled_circle(dot_x, 228, 3, blue_light);
+              else it.circle(dot_x, 228, 2, grey);
+            }
           }
 
           if (!id(enable_ir).state) {
@@ -1929,7 +1950,11 @@ display:
           if (!id(nav_lock)) {
             it.print(5, (240 - 5), id(font_icon_large), TextAlign::BOTTOM_LEFT, "\U000F004F");
             it.print((320 - 5), (240 - 5), id(font_icon_large), TextAlign::BOTTOM_RIGHT, "\U000F0056");
-            it.print((320 / 2), (240 - 12), id(font_small), blue_light, TextAlign::CENTER, "○  ○  ○  •  ○");
+            for (int i = 0; i < 5; i++) {
+              int dot_x = 160 - 24 + (i * 12);
+              if (i == 3) it.filled_circle(dot_x, 228, 3, blue_light);
+              else it.circle(dot_x, 228, 2, grey);
+            }
           }
 
           int x = 15;
