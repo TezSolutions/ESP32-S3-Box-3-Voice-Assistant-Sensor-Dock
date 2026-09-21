@@ -59,7 +59,7 @@ esphome:
       - component.update: s3_box_lcd
       - media_player.volume_set:
           id: speaker_media_player
-          volume: 80%
+          volume: 60%
       - lambda: |-
           id(mww_jarvis).enable();
   project:
@@ -217,8 +217,8 @@ media_player:
   - id: speaker_media_player
     platform: speaker
     name: "S3 Box 3 Media Player"
-    volume_min: 0.5
-    volume_max: 0.9
+    volume_min: 0.3
+    volume_max: 0.75
     announcement_pipeline:
       speaker: box_speaker
       format: FLAC
