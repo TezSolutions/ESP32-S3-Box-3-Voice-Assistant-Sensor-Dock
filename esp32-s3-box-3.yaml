@@ -15,7 +15,7 @@ substitutions:
   error_sound: 'http://192.168.1.101:8123/local/sounds/error.mp3'
 
   # ----- don't mess with anything below this line (except, optionally, the TODOs) -----
-  VERSION: '1.3.2-sentinel.1'
+  VERSION: '1.3.7-sentinel.1'
   ALLOWED_CHARACTERS: " !#%\"'()+,-./0123456789:;<>?@ABCDEFGHIJKLMNOPQRSTUVWYZ[]_abcdefghijklmnopqrstuvwxyz{|}°²³µ¿ÁÂÄÅÉÖÚßàáâãäåæçèéêëìíîðñòóôõöøùúûüýþāăąćčďĐđēėęěğĮįıļľŁłńňőřśšťũūůűųźŻżŽžơưșțΆΈΌΐΑΒΓΔΕΖΗΘΚΜΝΠΡΣΤΥΦάέήίαβγδεζηθικλμνξοπρςστυφχψωϊόύώАБВГДЕЖЗИКЛМНОПРСТУХЦЧШЪЭЮЯабвгдежзийклмнопрстуфхцчшщъыьэюяёђєіїјљњћ"
   
   VA_IN_HOME_ASSISTANT: "In Home Assistant"
@@ -48,6 +48,8 @@ esphome:
   friendly_name: ${friendly_name}
   min_version: 2025.2.0
   name_add_mac_suffix: true
+  includes:
+    - ui_helpers.h
   on_boot:
     priority: 600
     then:
@@ -84,6 +86,14 @@ ota:
   - platform: esphome
     password: ${ota_password}
 
+# QR code shown on the loading screen while in WiFi provisioning (fallback AP) mode.
+# Encodes the standard WiFi-join format: scan with any phone camera to connect.
+# NOTE: keep SSID/password in sync with the wifi: ap: block below.
+qr_code:
+  - id: provision_qr
+    ecc: MEDIUM
+    value: 'WIFI:T:WPA;S:${name};P:s3box123;;'
+
 logger:
   hardware_uart: USB_SERIAL_JTAG
   level: DEBUG
@@ -115,9 +125,17 @@ captive_portal:
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
+  # Reboot sooner when WiFi is dead so the device re-enters INITIAL_CONNECT;
+  # with ap: configured, a failed initial connect raises the fallback hotspot
+  # (stuck SCAN_CONNECTING/RETRY_HIDDEN loops never reach the AP trigger).
+  reboot_timeout: 5min
   ap:
     ssid: ${name}
     password: s3box123
+    # Raise the fallback hotspot ~30s after boot even while connection retries
+    # continue, so provisioning is available immediately (default 90s, and the
+    # hidden-candidate retry loop can delay it minutes)
+    ap_timeout: 30s
   on_connect:
     - script.execute: check_touchscreen_failure
     - script.wait: check_touchscreen_failure
@@ -561,21 +579,65 @@ number:
 
 font:
   - file: "gfonts://Roboto@500"
+    id: font_badge
+    size: 11
+    glyphs: ${ALLOWED_CHARACTERS}
+  - file: "gfonts://Roboto@500"
     id: font_small
-    size: 14
+    size: 13
+    glyphs: ${ALLOWED_CHARACTERS}
+  - file: "gfonts://Roboto@500"
+    id: font_title
+    size: 15
     glyphs: ${ALLOWED_CHARACTERS}
   - file: "gfonts://Roboto@500"
     id: font_medium
-    size: 24
+    size: 22
     glyphs: ${ALLOWED_CHARACTERS}
   - file: "gfonts://Roboto@500"
     id: font_large
-    size: 40
+    size: 38
     glyphs: ${ALLOWED_CHARACTERS}
   - file: "gfonts://Roboto@500"
     id: font_extra_large
     size: 60
     glyphs: [Z]
+  - file: "fonts/materialdesignicons-webfont.ttf"
+    id: font_icon_bar
+    size: 16
+    glyphs: [
+      "\U000F16BD", # wifi connected
+      "\U000F16BC", # wifi disconnected
+      "\U000F07D0", # api connected
+      "\U000F087B", # api disconnected
+      "\U000F0079", # battery 100%
+      "\U000F007D", # battery 40%
+      "\U000F007A", # battery 10%
+      "\U000F10CD", # battery warning
+      "\U000F050F", # temp sensor
+      "\U000F0330", # ir active
+      "\U000F032E", # ir inactive
+      "\U000F057E", # speaker on
+      "\U000F0580", # speaker volume
+      "\U000F0581", # speaker off
+      "\U000F009A", # bell
+      "\U000F00AD", # block-helper / mute
+      "\U000F01F2", # emoticon-outline
+      "\U000F06A9", # robot
+      "\U000F036C", # microphone
+      "\U000F0452", # remote
+      "\U000F04B2", # sleep
+      "\U000F0493", # settings cog
+    ]
+  - file: "fonts/materialdesignicons-webfont.ttf"
+    id: font_icon_nav
+    size: 26
+    glyphs: [
+      "\U000F0141", # chevron-left
+      "\U000F0142", # chevron-right
+      "\U000F004F", # arrow-left-bold-circle
+      "\U000F0056", # arrow-right-bold-circle
+    ]
   - file: "fonts/materialdesignicons-webfont.ttf"
     id: font_icon_tiny
     size: 30
@@ -663,6 +725,15 @@ image:
     id: loading_img
     type: RGB
     transparency: alpha_channel
+  - file: "images/sleeping.png"
+    id: sleeping_img
+    type: RGB
+    transparency: alpha_channel
+  # Small Tez wordmark shown on the provisioning screen
+  - file: "images/tez_logo.png"
+    id: tez_logo_img
+    type: RGB
+    transparency: alpha_channel
 
 color:
   - id: green
@@ -693,6 +764,14 @@ color:
     hex: '64748B'
   - id: grey_dark
     hex: '202020'
+  - id: card_bg
+    hex: '131C2E'
+  - id: card_border
+    hex: '23314A'
+  - id: card_active
+    hex: '0E2A47'
+  - id: text_dim
+    hex: '94A3B8'
 
 globals:
   # saved to flash
@@ -1268,10 +1347,10 @@ binary_sensor:
   - id: settings_volume_down
     platform: touchscreen
     internal: true
-    x_min: 180
-    x_max: 210
-    y_min: 90
-    y_max: 120
+    x_min: 175
+    x_max: 215
+    y_min: 84
+    y_max: 124
     on_press:
       then:
         - if:
@@ -1291,10 +1370,10 @@ binary_sensor:
   - id: settings_volume_up
     platform: touchscreen
     internal: true
-    x_min: 280
-    x_max: 310
-    y_min: 90
-    y_max: 120
+    x_min: 265
+    x_max: 305
+    y_min: 84
+    y_max: 124
     on_press:
       then:
         - if:
@@ -1314,10 +1393,10 @@ binary_sensor:
   - id: settings_sleep_down
     platform: touchscreen
     internal: true
-    x_min: 180
-    x_max: 210
-    y_min: 130
-    y_max: 160
+    x_min: 175
+    x_max: 215
+    y_min: 128
+    y_max: 168
     on_press:
       then:
         - if:
@@ -1338,10 +1417,10 @@ binary_sensor:
   - id: settings_sleep_up
     platform: touchscreen
     internal: true
-    x_min: 280
-    x_max: 310
-    y_min: 130
-    y_max: 160
+    x_min: 265
+    x_max: 305
+    y_min: 128
+    y_max: 168
     on_press:
       then:
         - if:
@@ -1359,10 +1438,10 @@ binary_sensor:
   - id: ts_va_toggle
     platform: touchscreen
     internal: true
-    x_min: 75
-    x_max: 245
-    y_min: 55
-    y_max: 195
+    x_min: 60
+    x_max: 260
+    y_min: 40
+    y_max: 210
     on_press:
       then:
         - if:
@@ -1380,10 +1459,10 @@ binary_sensor:
   - id: settings_mute
     platform: touchscreen
     internal: true
-    x_min: 220
-    x_max: 270
-    y_min: 50
-    y_max: 80
+    x_min: 215
+    x_max: 305
+    y_min: 36
+    y_max: 76
     on_press:
       then:
         - if:
@@ -1396,6 +1475,13 @@ binary_sensor:
 interval:
   - interval: 1s
     then:
+      # Provisioning screen redraw: once the fallback AP raises, refresh the
+      # loading page so the WiFi QR + details appear without waiting for wifi.
+      - if:
+          condition:
+            - lambda: 'return id(app_state) == ${APP_STATE_LOADING} && wifi::global_wifi_component != nullptr && !wifi::global_wifi_component->is_connected();'
+          then:
+            - component.update: s3_box_lcd
       # IR learning loop
       - if:
           condition:
@@ -1747,343 +1833,349 @@ display:
       - id: loading_page
         lambda: |-
           it.fill(Color::BLACK);
-          it.image((320 / 2), (240 / 2), id(loading_img), ImageAlign::CENTER);
+          if (wifi::global_wifi_component != nullptr && !wifi::global_wifi_component->is_connected()) {
+            // Provisioning mode: fallback AP active — show join QR + connection details
+            it.print(160, 12, id(font_title), Color(255,255,255), TextAlign::TOP_CENTER, "WiFi Setup");
+            int qr_scale = 3;
+            int qr_size = (int) id(provision_qr).get_size() * qr_scale;
+            // it.qr_code() takes TOP-LEFT coords, not center. QR is 29 modules
+            // × scale 3 = 87px wide; left edge x15 → right edge x102, text at
+            // x118 leaves a clear ~16px gap.
+            it.qr_code(15, (int)(110 - qr_size / 2), id(provision_qr), Color(255,255,255), qr_scale);
+            it.printf(118, 68, id(font_small), Color(255,255,255), "SSID: ${name}");
+            it.printf(118, 94, id(font_small), Color(255,255,255), "Pass: s3box123");
+            it.printf(118, 120, id(font_small), Color(255,255,255), "Portal:");
+            it.printf(118, 140, id(font_small), Color(200,200,200), "http://192.168.4.1");
+            it.image(160, 172, id(tez_logo_img), ImageAlign::TOP_CENTER);
+            it.printf(160, 212, id(font_small), Color(255,255,255), TextAlign::TOP_CENTER, "Scan QR to join");
+          } else {
+            it.image(160, 120, id(loading_img), ImageAlign::CENTER);
+          }
 
       - id: status_page
         lambda: |-
-          int y = 0;
-          int x = 15;
-          int xinc = 60;
-
           it.fill(Color::BLACK);
-          
-          // # print nav buttons
+
+          sentinel_ui::draw_top_bar(
+            it, "SENTINEL SATELLITE",
+            id(font_title), id(font_badge), id(font_icon_bar),
+            card_bg, card_border, white, blue_light, green, red, amber, grey,
+            network::is_connected(),
+            api::global_api_server->is_connected(),
+            id(s3temp).has_state() ? id(s3temp).state : 0.0f,
+            id(s3temp).has_state(),
+            id(enable_ir).state,
+            id(battery_percent).has_state() ? (int)id(battery_percent).state : 100,
+            id(battery_percent).has_state()
+          );
+
           if (!id(nav_lock)) {
-            it.print(5, (240 - 5), id(font_icon_large), TextAlign::BOTTOM_LEFT, "\U000F004F");
-            it.print((320 - 5), (240 - 5), id(font_icon_large), TextAlign::BOTTOM_RIGHT, "\U000F0056");
-            for (int i = 0; i < 5; i++) {
-              int dot_x = 160 - 24 + (i * 12);
-              if (i == 0) it.filled_circle(dot_x, 228, 3, blue_light);
-              else it.circle(dot_x, 228, 2, grey);
-            }
+            sentinel_ui::draw_bottom_nav(it, 0, 5, id(font_icon_nav), blue, grey_dark, grey);
           }
 
-          it.print((320 / 2), 2, id(font_small), yellow, TextAlign::TOP_CENTER, "SENTINEL SATELLITE");
-          y = 20;
-
-          if (network::is_connected()) {
-            it.print(x, y, id(font_icon_small), lime, "\U000F16BD");
-          } else {
-            it.print(x, y, id(font_icon_small), red, "\U000F16BC");
-          }
-          x += xinc;
-
-          if (api::global_api_server->is_connected()) {
-            it.print(x, y, id(font_icon_small), blue, "\U000F07D0");
-          } else {
-            it.print(x, y, id(font_icon_small), red, "\U000F087B");
-          }
-          x += xinc;
-
-          x += 3; // battery icon
-          if (id(battery_voltage).has_state ()) {
-              if (id(battery_voltage).state <= 2.7) {
-                  it.print(x, y, id(font_icon_small), red, "\U000F10CD");
-              } else if (id(battery_percent).state >= 70) {
-                  it.print(x, y, id(font_icon_small), green, "\U000F0079");
-              } else if (id(battery_percent).state >= 30) {
-                  it.print(x, y, id(font_icon_small), amber, "\U000F007D");
-              } else {
-                  it.print(x, y, id(font_icon_small), red, "\U000F007A");
-              }
-          }
-          x += xinc;
-
-          if (id(enable_ir).state) {
-            it.print(x, y, id(font_icon_small), yellow, "\U000F0330");
-          } else {
-            it.print(x, y, id(font_icon_small), grey, "\U000F032E");
-          }
-          x += xinc;
-          
-          x -= 10;
-          it.print(x, y, id(font_icon_small), blue, "\U000F050F");
-          if (id(s3temp).has_state()) {
-            it.printf(x + 22, y + 41, id(font_small), white, TextAlign::BOTTOM_CENTER, "%.0f°C", id(s3temp).state);
-          }
-
-          // Cute Robot Mascot Centered with Tez Logo (160x130)
+          // Cute Robot Mascot Centered (160x130 at y=114)
           if (id(mute_error)) {
-            it.image((it.get_width() / 2), 120, id(error_img), ImageAlign::CENTER);
-            it.print((it.get_width() / 2), 194, id(font_small), red, TextAlign::CENTER, "HARDWARE MUTED");
+            it.image(160, 114, id(error_img), ImageAlign::CENTER);
+            sentinel_ui::draw_status_pill(it, 160, 196, 170, 22, card_bg, card_border, red, id(font_badge), red, "HARDWARE MUTED");
           } else {
             switch (id(va_state)) {
               case ${VA_STATE_NOT_READY}:
-                it.image((it.get_width() / 2), 120, id(notready_img), ImageAlign::CENTER);
-                it.print((it.get_width() / 2), 194, id(font_small), grey, TextAlign::CENTER, "CONNECTING...");
+                it.image(160, 114, id(notready_img), ImageAlign::CENTER);
+                sentinel_ui::draw_status_pill(it, 160, 196, 170, 22, card_bg, card_border, grey, id(font_badge), text_dim, "CONNECTING...");
                 break;
               case ${VA_STATE_IDLE}:
-                it.image((it.get_width() / 2), 120, id(idle_img), ImageAlign::CENTER);
+                it.image(160, 114, id(idle_img), ImageAlign::CENTER);
                 if (id(mem_va_speaker_mode).state == "${VA_SPEAKER_MUTE}") {
-                  it.print((it.get_width() / 2), 194, id(font_small), amber, TextAlign::CENTER, "MUTED  |  TAP TO WAKE");
+                  sentinel_ui::draw_status_pill(it, 160, 196, 190, 22, card_bg, card_border, amber, id(font_badge), amber, "MUTED  •  TAP TO WAKE");
                 } else {
-                  it.print((it.get_width() / 2), 194, id(font_small), blue_light, TextAlign::CENTER, "READY  |  \"HEY JARVIS\"");
+                  sentinel_ui::draw_status_pill(it, 160, 196, 190, 22, card_bg, card_border, blue, id(font_badge), blue_light, "READY  •  \"HEY JARVIS\"");
                 }
                 break;
               case ${VA_STATE_LISTENING}:
-                it.image((it.get_width() / 2), 120, id(listening_img), ImageAlign::CENTER);
-                it.print((it.get_width() / 2), 194, id(font_small), blue, TextAlign::CENTER, "LISTENING...");
+                it.image(160, 114, id(listening_img), ImageAlign::CENTER);
+                sentinel_ui::draw_status_pill(it, 160, 196, 170, 22, card_bg, card_border, blue, id(font_badge), blue, "LISTENING...");
                 break;
               case ${VA_STATE_THINKING}:
-                it.image((it.get_width() / 2), 120, id(thinking_img), ImageAlign::CENTER);
-                it.print((it.get_width() / 2), 194, id(font_small), purple, TextAlign::CENTER, "PROCESSING...");
+                it.image(160, 114, id(thinking_img), ImageAlign::CENTER);
+                sentinel_ui::draw_status_pill(it, 160, 196, 170, 22, card_bg, card_border, purple, id(font_badge), purple, "PROCESSING...");
                 break;
               case ${VA_STATE_REPLYING}:
-                it.image((it.get_width() / 2), 120, id(replying_img), ImageAlign::CENTER);
-                it.print((it.get_width() / 2), 194, id(font_small), green, TextAlign::CENTER, "SPEAKING...");
+                it.image(160, 114, id(replying_img), ImageAlign::CENTER);
+                sentinel_ui::draw_status_pill(it, 160, 196, 170, 22, card_bg, card_border, green, id(font_badge), green, "SPEAKING...");
                 break;
               case ${VA_STATE_ERROR}:
-                it.image((it.get_width() / 2), 120, id(error_img), ImageAlign::CENTER);
-                it.print((it.get_width() / 2), 194, id(font_small), red, TextAlign::CENTER, "ERROR");
+                it.image(160, 114, id(error_img), ImageAlign::CENTER);
+                sentinel_ui::draw_status_pill(it, 160, 196, 170, 22, card_bg, card_border, red, id(font_badge), red, "ERROR");
                 break;
             }
           }
 
       - id: ir_learn_page
         lambda: |-
-          int y = 0;
-          int x = 15;
-          int xinc = 65; // # must be kept in sync with touchscreen buttons
-          int btnRadius = 24;
-
           it.fill(Color::BLACK);
-          it.print((it.get_width() / 2), 2, id(font_small), yellow, TextAlign::TOP_CENTER, "IR LEARNING");
-          y += 46;
 
-          // # print nav buttons
+          sentinel_ui::draw_top_bar(
+            it, "IR LEARNING",
+            id(font_title), id(font_badge), id(font_icon_bar),
+            card_bg, card_border, white, blue_light, green, red, amber, grey,
+            network::is_connected(),
+            api::global_api_server->is_connected(),
+            id(s3temp).has_state() ? id(s3temp).state : 0.0f,
+            id(s3temp).has_state(),
+            id(enable_ir).state,
+            id(battery_percent).has_state() ? (int)id(battery_percent).state : 100,
+            id(battery_percent).has_state()
+          );
+
           if (!id(nav_lock)) {
-            it.print(5, (240 - 5), id(font_icon_large), TextAlign::BOTTOM_LEFT, "\U000F004F");
-            it.print((320 - 5), (240 - 5), id(font_icon_large), TextAlign::BOTTOM_RIGHT, "\U000F0056");
-            for (int i = 0; i < 5; i++) {
-              int dot_x = 160 - 24 + (i * 12);
-              if (i == 1) it.filled_circle(dot_x, 228, 3, blue_light);
-              else it.circle(dot_x, 228, 2, grey);
-            }
+            sentinel_ui::draw_bottom_nav(it, 1, 5, id(font_icon_nav), blue, grey_dark, grey);
           }
 
           if (!id(enable_ir).state) {
-            it.print(320 / 2, 240 / 2, id(font_small), white, TextAlign::TOP_CENTER, "The IR must be powered to proceed");
+            sentinel_ui::draw_rounded_card(it, 20, 80, 280, 70, 8, card_bg, card_border);
+            it.print(160, 105, id(font_small), amber, TextAlign::CENTER, "IR sensor dock power required");
+            it.print(160, 128, id(font_badge), text_dim, TextAlign::CENTER, "Enable IR transceiver in Home Assistant");
             return;
           }
 
           if (id(ir_memory_button_selected) == -1) {
-            // # recording buttons
-            it.print(x, y, id(font_small), white, "IR Memory Buttons:");
-            x = 40;
-            y = 66; // # must be kept in sync with touchscreen buttons
-            it.filled_circle(x + btnRadius, y + btnRadius, btnRadius, (id(ir_memory_button_codes)[0].length() > 0) ? blue_light : blue_dark);
-            it.print(x + btnRadius , y + btnRadius , id(font_large), white, TextAlign::CENTER, "1");
-            x += xinc;
-            it.filled_circle(x + btnRadius , y + btnRadius , btnRadius, (id(ir_memory_button_codes)[1].length() > 0) ? blue_light : blue_dark);
-            it.print(x + btnRadius , y + btnRadius , id(font_large), white, TextAlign::CENTER, "2");
-            x += xinc;
-            it.filled_circle(x + btnRadius , y + btnRadius , btnRadius, (id(ir_memory_button_codes)[2].length() > 0) ? blue_light : blue_dark);
-            it.print(x + btnRadius , y + btnRadius , id(font_large), white, TextAlign::CENTER, "3");
-            x += xinc;
-            it.filled_circle(x + btnRadius , y + btnRadius , btnRadius, (id(ir_memory_button_codes)[3].length() > 0) ? blue_light : blue_dark);
-            it.print(x + btnRadius , y + btnRadius , id(font_large), white, TextAlign::CENTER, "4");
-          } else {
-            it.printf(x, y, id(font_small), white, "Recording IR Memory Button %d", id(ir_memory_button_selected) + 1);
-            y += 30;
-            it.print(x, y, id(font_small), white, "When the icon turns yellow,");
-            y += 15;
-            it.print(x, y, id(font_small), white, "press the button you want to record.");
-            y += 15;
-            if (id(ir_learning_state) == 2) {
-              it.print(320 / 2, y, id(font_icon_small), yellow, TextAlign::TOP_CENTER, "\U000F0330");
-            } else {
-              it.print(320 / 2, y, id(font_icon_small), blue_dark, TextAlign::TOP_CENTER, "\U000F032E");
+            it.print(160, 42, id(font_badge), text_dim, TextAlign::CENTER, "Select a slot to record remote signal:");
+            for (int i = 0; i < 4; i++) {
+              int sx = 40 + i * 65;
+              int sy = 64;
+              bool saved = (id(ir_memory_button_codes)[i].length() > 0);
+              sentinel_ui::draw_rounded_card(it, sx, sy, 48, 48, 8, saved ? card_active : card_bg, saved ? blue : card_border);
+              it.printf(sx + 24, sy + 24, id(font_medium), saved ? white : grey, TextAlign::CENTER, "%d", i + 1);
+              it.print(sx + 24, sy + 56, id(font_badge), saved ? blue_light : grey_dark, TextAlign::CENTER, saved ? "SAVED" : "EMPTY");
             }
-            y += 45;
-            
-            // # cancel button
-            y = 200;
-            it.filled_rectangle( (320 / 2) - 30, y, 60, 25, red);
-            y += 5;
-            it.print(320 / 2, y, id(font_small), white, TextAlign::TOP_CENTER, "Cancel");
+
+            sentinel_ui::draw_rounded_card(it, 20, 138, 280, 60, 8, card_bg, card_border);
+            it.print(32, 153, id(font_small), white, TextAlign::TOP_LEFT, "1. Tap an empty memory slot above");
+            it.print(32, 173, id(font_small), text_dim, TextAlign::TOP_LEFT, "2. Point remote at Sentinel & press button");
+          } else {
+            it.printf(160, 42, id(font_small), white, TextAlign::CENTER, "Recording Slot %d", id(ir_memory_button_selected) + 1);
+
+            for (int i = 0; i < 4; i++) {
+              int sx = 40 + i * 65;
+              int sy = 64;
+              bool is_target = (id(ir_memory_button_selected) == i);
+              bool saved = (id(ir_memory_button_codes)[i].length() > 0);
+              sentinel_ui::draw_rounded_card(it, sx, sy, 48, 48, 8, is_target ? card_active : card_bg, is_target ? amber : (saved ? blue : card_border));
+              it.printf(sx + 24, sy + 24, id(font_medium), is_target ? amber : (saved ? white : grey), TextAlign::CENTER, "%d", i + 1);
+            }
+
+            sentinel_ui::draw_rounded_card(it, 20, 128, 280, 58, 8, card_bg, card_border);
+            if (id(ir_learning_state) == 2) {
+              it.print(160, 142, id(font_icon_bar), amber, TextAlign::CENTER, "\U000F0330");
+              it.print(160, 164, id(font_small), amber, TextAlign::CENTER, "Press remote key now...");
+            } else {
+              it.print(160, 142, id(font_icon_bar), blue, TextAlign::CENTER, "\U000F032E");
+              it.print(160, 164, id(font_small), blue_light, TextAlign::CENTER, "Preparing IR sensor...");
+            }
+
+            sentinel_ui::draw_rounded_card(it, 125, 198, 70, 26, 6, card_bg, red);
+            it.print(160, 211, id(font_badge), red, TextAlign::CENTER, "CANCEL");
           }
 
       - id: ir_blast_page
         lambda: |-
           it.fill(Color::BLACK);
-          it.print((it.get_width() / 2), 2, id(font_small), yellow, TextAlign::TOP_CENTER, "IR TRANSMITTER");
 
-          // # print nav buttons
+          sentinel_ui::draw_top_bar(
+            it, "IR TRANSMITTER",
+            id(font_title), id(font_badge), id(font_icon_bar),
+            card_bg, card_border, white, blue_light, green, red, amber, grey,
+            network::is_connected(),
+            api::global_api_server->is_connected(),
+            id(s3temp).has_state() ? id(s3temp).state : 0.0f,
+            id(s3temp).has_state(),
+            id(enable_ir).state,
+            id(battery_percent).has_state() ? (int)id(battery_percent).state : 100,
+            id(battery_percent).has_state()
+          );
+
           if (!id(nav_lock)) {
-            it.print(5, (240 - 5), id(font_icon_large), TextAlign::BOTTOM_LEFT, "\U000F004F");
-            it.print((320 - 5), (240 - 5), id(font_icon_large), TextAlign::BOTTOM_RIGHT, "\U000F0056");
-            for (int i = 0; i < 5; i++) {
-              int dot_x = 160 - 24 + (i * 12);
-              if (i == 2) it.filled_circle(dot_x, 228, 3, blue_light);
-              else it.circle(dot_x, 228, 2, grey);
-            }
+            sentinel_ui::draw_bottom_nav(it, 2, 5, id(font_icon_nav), blue, grey_dark, grey);
           }
 
           if (!id(enable_ir).state) {
-            it.print(320 / 2, 240 / 2, id(font_small), white, TextAlign::TOP_CENTER, "The IR must be powered to proceed");
+            sentinel_ui::draw_rounded_card(it, 20, 80, 280, 70, 8, card_bg, card_border);
+            it.print(160, 105, id(font_small), amber, TextAlign::CENTER, "IR sensor dock power required");
+            it.print(160, 128, id(font_badge), text_dim, TextAlign::CENTER, "Enable IR transceiver in Home Assistant");
             return;
           }
 
-          int xinc = 65; // # must be kept in sync with touchscreen buttons
-          int btnRadius = 24;
+          it.print(160, 42, id(font_badge), text_dim, TextAlign::CENTER, "Tap slot to transmit learned IR signal:");
+          for (int i = 0; i < 4; i++) {
+            int sx = 40 + i * 65;
+            int sy = 64;
+            bool saved = (id(ir_memory_button_codes)[i].length() > 0);
+            sentinel_ui::draw_rounded_card(it, sx, sy, 48, 48, 8, saved ? card_active : card_bg, saved ? blue : card_border);
+            it.printf(sx + 24, sy + 24, id(font_medium), saved ? white : grey, TextAlign::CENTER, "%d", i + 1);
+            it.print(sx + 24, sy + 56, id(font_badge), saved ? blue_light : grey_dark, TextAlign::CENTER, saved ? "SAVED" : "EMPTY");
+          }
 
-          int x = 40;
-          int y = 66; // # must be kept in sync with touchscreen buttons
-          it.filled_circle(x + btnRadius, y + btnRadius, btnRadius, (id(ir_memory_button_codes)[0].length() > 0) ? blue_light : blue_dark);
-          it.print(x + btnRadius , y + btnRadius , id(font_large), white, TextAlign::CENTER, "1");
-          x += xinc;
-          it.filled_circle(x + btnRadius , y + btnRadius , btnRadius, (id(ir_memory_button_codes)[1].length() > 0) ? blue_light : blue_dark);
-          it.print(x + btnRadius , y + btnRadius , id(font_large), white, TextAlign::CENTER, "2");
-          x += xinc;
-          it.filled_circle(x + btnRadius , y + btnRadius , btnRadius, (id(ir_memory_button_codes)[2].length() > 0) ? blue_light : blue_dark);
-          it.print(x + btnRadius , y + btnRadius , id(font_large), white, TextAlign::CENTER, "3");
-          x += xinc;
-          it.filled_circle(x + btnRadius , y + btnRadius , btnRadius, (id(ir_memory_button_codes)[3].length() > 0) ? blue_light : blue_dark);
-          it.print(x + btnRadius , y + btnRadius , id(font_large), white, TextAlign::CENTER, "4");
+          sentinel_ui::draw_rounded_card(it, 20, 138, 280, 56, 8, card_bg, card_border);
+          it.print(40, 166, id(font_icon_bar), blue, TextAlign::CENTER, "\U000F0452");
+          it.print(168, 166, id(font_small), blue_light, TextAlign::CENTER, "IR TRANSMITTER READY");
 
       - id: voice_assistant_page
         lambda: |-
           it.fill(Color::BLACK);
-          it.print((it.get_width() / 2), 2, id(font_small), yellow, TextAlign::TOP_CENTER, "VOICE ASSISTANT");
 
-          // # print nav buttons
+          sentinel_ui::draw_top_bar(
+            it, "VOICE ASSISTANT",
+            id(font_title), id(font_badge), id(font_icon_bar),
+            card_bg, card_border, white, blue_light, green, red, amber, grey,
+            network::is_connected(),
+            api::global_api_server->is_connected(),
+            id(s3temp).has_state() ? id(s3temp).state : 0.0f,
+            id(s3temp).has_state(),
+            id(enable_ir).state,
+            id(battery_percent).has_state() ? (int)id(battery_percent).state : 100,
+            id(battery_percent).has_state()
+          );
+
           if (!id(nav_lock)) {
-            it.print(5, (240 - 5), id(font_icon_large), TextAlign::BOTTOM_LEFT, "\U000F004F");
-            it.print((320 - 5), (240 - 5), id(font_icon_large), TextAlign::BOTTOM_RIGHT, "\U000F0056");
-            for (int i = 0; i < 5; i++) {
-              int dot_x = 160 - 24 + (i * 12);
-              if (i == 3) it.filled_circle(dot_x, 228, 3, blue_light);
-              else it.circle(dot_x, 228, 2, grey);
-            }
+            sentinel_ui::draw_bottom_nav(it, 3, 5, id(font_icon_nav), blue, grey_dark, grey);
           }
 
-          int x = 15;
-          int y = 32;
-
-          it.printf(x, y, id(font_small), white, "Engine: %s   |   Speaker: %s", 
-                    id(mem_wake_word_engine_location).state.c_str(),
-                    id(mem_va_speaker_mode).state.c_str());
-
-          y += 20;
-          std::string stateStr = "Idle";
+          // State header card
+          sentinel_ui::draw_rounded_card(it, 14, 34, 292, 24, 6, card_bg, card_border);
+          const char *state_txt = "STATUS: READY";
+          Color state_col = blue;
           switch (id(va_state)) {
-            case ${VA_STATE_IDLE}:
-              stateStr = "Idle (Ready)";
-              break;
-            case ${VA_STATE_LISTENING}:
-              stateStr = "Listening...";
-              break;
-            case ${VA_STATE_THINKING}:
-              stateStr = "Thinking...";
-              break;
-            case ${VA_STATE_NOT_READY}:
-              stateStr = "Not Ready";
-              break;
-            case ${VA_STATE_REPLYING}:
-              stateStr = "Replying...";
-              break;
-            case ${VA_STATE_ERROR}:
-              stateStr = "Error";
-              break;
-            case ${VA_STATE_MUTED}:
-              stateStr = "Muted";
-              break;
+            case ${VA_STATE_IDLE}: state_txt = "STATUS: READY"; state_col = blue; break;
+            case ${VA_STATE_LISTENING}: state_txt = "STATUS: LISTENING..."; state_col = blue; break;
+            case ${VA_STATE_THINKING}: state_txt = "STATUS: PROCESSING..."; state_col = purple; break;
+            case ${VA_STATE_REPLYING}: state_txt = "STATUS: SPEAKING..."; state_col = green; break;
+            case ${VA_STATE_NOT_READY}: state_txt = "STATUS: CONNECTING"; state_col = grey; break;
+            case ${VA_STATE_ERROR}: state_txt = "STATUS: ERROR"; state_col = red; break;
+            case ${VA_STATE_MUTED}: state_txt = "STATUS: MUTED"; state_col = amber; break;
           }
-          it.printf(x, y, id(font_small), blue_light, "Current state: %s", stateStr.c_str());
+          it.filled_circle(24, 46, 3, state_col);
+          it.print(34, 46, id(font_badge), state_col, TextAlign::CENTER_LEFT, state_txt);
+          it.printf(294, 46, id(font_badge), text_dim, TextAlign::CENTER_RIGHT, "Jarvis • %s", id(mem_va_speaker_mode).state.c_str());
 
-          if (id(va_request).state.length() > 0) {
-            y += 20;
-            it.print(x, y, id(font_small), yellow, "Last request:");
-            y += 16;
-            it.printf(x, y, id(font_small), white, "%s", id(va_request).state.c_str());
-          }
+          bool has_req = (id(va_request).state.length() > 0);
+          bool has_res = (id(va_response).state.length() > 0);
 
-          if (id(va_response).state.length() > 0) {
-            y += 20;
-            it.print(x, y, id(font_small), green, "Last response:");
-            y += 16;
-            it.printf(x, y, id(font_small), white, "%s", id(va_response).state.c_str());
+          if (has_req || has_res) {
+            if (has_req) {
+              sentinel_ui::draw_rounded_card(it, 14, 62, 292, 54, 8, card_bg, card_border);
+              it.print(24, 74, id(font_icon_bar), blue, TextAlign::TOP_LEFT, "\U000F036C");
+              it.print(46, 74, id(font_badge), blue, TextAlign::TOP_LEFT, "You");
+              it.print(24, 95, id(font_small), white, TextAlign::TOP_LEFT, id(va_request).state.c_str());
+            }
+            if (has_res) {
+              sentinel_ui::draw_rounded_card(it, 14, 122, 292, 68, 8, card_bg, card_border);
+              it.print(24, 134, id(font_icon_bar), green, TextAlign::TOP_LEFT, "\U000F06A9");
+              it.print(46, 134, id(font_badge), green, TextAlign::TOP_LEFT, "Sentinel");
+              it.print(24, 155, id(font_small), white, TextAlign::TOP_LEFT, id(va_response).state.c_str());
+            }
+          } else {
+            sentinel_ui::draw_rounded_card(it, 20, 68, 280, 122, 8, card_bg, card_border);
+            it.image(75, 129, id(idle_img), ImageAlign::CENTER);
+            it.print(200, 105, id(font_small), white, TextAlign::CENTER, "\"Hey Jarvis...\"");
+            it.print(200, 128, id(font_badge), blue_light, TextAlign::CENTER, "Ask questions,");
+            it.print(200, 146, id(font_badge), text_dim, TextAlign::CENTER, "control devices, & more");
           }
 
           if (id(mute_error)) {
-            y += 20;
-            it.print(x, y, id(font_small), red, "HW mute error. Reboot device to restore VA.");
+            sentinel_ui::draw_rounded_card(it, 14, 122, 292, 40, 8, card_bg, red);
+            it.print(160, 142, id(font_small), red, TextAlign::CENTER, "HW mute error. Reboot to restore.");
           }
 
       - id: settings_page
         lambda: |-
           it.fill(Color::BLACK);
-          it.print((it.get_width() / 2), 2, id(font_small), yellow, TextAlign::TOP_CENTER, "SETTINGS");
 
-          // # print nav buttons
+          sentinel_ui::draw_top_bar(
+            it, "SETTINGS",
+            id(font_title), id(font_badge), id(font_icon_bar),
+            card_bg, card_border, white, blue_light, green, red, amber, grey,
+            network::is_connected(),
+            api::global_api_server->is_connected(),
+            id(s3temp).has_state() ? id(s3temp).state : 0.0f,
+            id(s3temp).has_state(),
+            id(enable_ir).state,
+            id(battery_percent).has_state() ? (int)id(battery_percent).state : 100,
+            id(battery_percent).has_state()
+          );
+
           if (!id(nav_lock)) {
-            it.print(5, (240 - 5), id(font_icon_large), TextAlign::BOTTOM_LEFT, "\U000F004F");
-            it.print((320 - 5), (240 - 5), id(font_icon_large), TextAlign::BOTTOM_RIGHT, "\U000F0056");
-            it.print((320 / 2), (240 - 12), id(font_small), blue_light, TextAlign::CENTER, "○  ○  ○  ○  •");
+            sentinel_ui::draw_bottom_nav(it, 4, 5, id(font_icon_nav), blue, grey_dark, grey);
           }
 
-          int x = 15;
-          int y = 50;
+          // Row 1: Speaker Mode [14..306, 36..76]
+          sentinel_ui::draw_rounded_card(it, 14, 36, 292, 40, 8, card_bg, card_border);
+          it.print(26, 48, id(font_icon_bar), green, TextAlign::TOP_LEFT, "\U000F057E");
+          it.print(52, 56, id(font_small), white, TextAlign::CENTER_LEFT, "Voice Speaker");
 
-          it.print(x, y, id(font_medium), white, "VA Speaker:");
+          const char* mode_label = "SPEECH";
+          Color mode_color = green;
           if (id(mem_va_speaker_mode).state == "${VA_SPEAKER_SPEECH}") {
-            it.print(x + 230, y - 8, id(font_icon_small), lime, TextAlign::TOP_CENTER, "\U000F01F2");
+            mode_label = "SPEECH";
+            mode_color = green;
           } else if (id(mem_va_speaker_mode).state == "${VA_SPEAKER_BEEP}") {
-            it.print(x + 230, y - 8, id(font_icon_small), yellow, TextAlign::TOP_CENTER, "\U000F009A");
+            mode_label = "BEEP";
+            mode_color = amber;
           } else {
-            it.print(x + 230, y - 8, id(font_icon_small), red, TextAlign::TOP_CENTER, "\U000F00AD");
+            mode_label = "MUTE";
+            mode_color = red;
           }
+          sentinel_ui::draw_rounded_card(it, 220, 42, 78, 28, 6, card_bg, mode_color);
+          it.print(259, 56, id(font_badge), mode_color, TextAlign::CENTER, mode_label);
 
-          y += 40;
+          // Row 2: Volume [14..306, 82..122]
+          sentinel_ui::draw_rounded_card(it, 14, 82, 292, 40, 8, card_bg, card_border);
+          it.print(26, 94, id(font_icon_bar), blue, TextAlign::TOP_LEFT, "\U000F0580");
+          it.print(52, 102, id(font_small), white, TextAlign::CENTER_LEFT, "Volume");
+
           int volume = (id(speaker_media_player).volume - 0.499) * 200;
-          it.print(x, y, id(font_medium), white, TextAlign::TOP_LEFT, "Volume:");
-          it.printf(x + 230, y, id(font_medium), white, TextAlign::TOP_CENTER, "%i%%", volume);
-          it.print(x + 180, y, id(font_icon_tiny), blue_light, TextAlign::TOP_CENTER, "\U000F0375");
-          it.print(x + 280, y, id(font_icon_tiny), blue_light, TextAlign::TOP_CENTER, "\U000F0416");
+          if (volume < 0) volume = 0;
+          if (volume > 100) volume = 100;
+          int fill_w = (volume * 60) / 100;
+          it.filled_rectangle(106, 99, 60, 6, card_border);
+          if (fill_w > 0) it.filled_rectangle(106, 99, fill_w, 6, blue);
 
-          y += 40;
-          it.print(x, y, id(font_medium), white, TextAlign::TOP_LEFT, "Sleep delay:");
-          it.printf(x + 230, y, id(font_medium), white, TextAlign::TOP_CENTER, "%is", (int)id(mem_settings_sleep_delay).state);
-          it.print(x + 180, y, id(font_icon_tiny), blue_light, TextAlign::TOP_CENTER, "\U000F0375");
-          it.print(x + 280, y, id(font_icon_tiny), blue_light, TextAlign::TOP_CENTER, "\U000F0416");
+          sentinel_ui::draw_rounded_card(it, 180, 88, 30, 28, 6, card_bg, card_border);
+          it.print(195, 102, id(font_medium), white, TextAlign::CENTER, "-");
+
+          it.printf(240, 102, id(font_badge), blue_light, TextAlign::CENTER, "%i%%", volume);
+
+          sentinel_ui::draw_rounded_card(it, 270, 88, 30, 28, 6, card_bg, card_border);
+          it.print(285, 102, id(font_medium), white, TextAlign::CENTER, "+");
+
+          // Row 3: Sleep Delay [14..306, 128..168]
+          sentinel_ui::draw_rounded_card(it, 14, 128, 292, 40, 8, card_bg, card_border);
+          it.print(26, 140, id(font_icon_bar), amber, TextAlign::TOP_LEFT, "\U000F04B2");
+          it.print(52, 148, id(font_small), white, TextAlign::CENTER_LEFT, "Sleep Delay");
+
+          sentinel_ui::draw_rounded_card(it, 180, 134, 30, 28, 6, card_bg, card_border);
+          it.print(195, 148, id(font_medium), white, TextAlign::CENTER, "-");
+
+          it.printf(240, 148, id(font_badge), amber, TextAlign::CENTER, "%is", (int)id(mem_settings_sleep_delay).state);
+
+          sentinel_ui::draw_rounded_card(it, 270, 134, 30, 28, 6, card_bg, card_border);
+          it.print(285, 148, id(font_medium), white, TextAlign::CENTER, "+");
 
       - id: screen_saver_page
         lambda: |-
           it.fill(Color::BLACK);
-          it.strftime(160, 90, id(font_large), white, TextAlign::CENTER, "%H:%M", id(ha_time).now());
-          it.strftime(160, 136, id(font_small), blue_light, TextAlign::CENTER, "%A, %d %b", id(ha_time).now());
+          it.image(82, 120, id(sleeping_img), ImageAlign::CENTER);
+          it.strftime(241, 75, id(font_large), white, TextAlign::CENTER, "%H:%M", id(ha_time).now());
+          it.strftime(241, 114, id(font_small), blue_light, TextAlign::CENTER, "%A, %d %b", id(ha_time).now());
           if (id(s3temp).has_state()) {
-            it.printf(160, 162, id(font_small), grey, TextAlign::CENTER, "Room Temp: %.1f°C", id(s3temp).state);
+            sentinel_ui::draw_rounded_card(it, 175, 138, 132, 26, 6, card_bg, card_border);
+            it.printf(241, 151, id(font_badge), grey, TextAlign::CENTER, "Room: %.1f°C", id(s3temp).state);
           }
 
       - id: touchscreen_error_page
         lambda: |-
           it.fill(Color::BLACK);
-          
-          int x = 15;
-          int y = 15;
-          
-          it.print(x, y, id(font_medium), white, TextAlign::TOP_LEFT, "The touchscreen failed to");
-          y += 25;
-
-          it.print(x, y, id(font_medium), white, TextAlign::TOP_LEFT, "setup. The Box will reboot");
-          y += 25;
-
-          it.printf(x, y, id(font_medium), white, TextAlign::TOP_LEFT, "in %i seconds.", id(touchscreen_error_counter));
-          y += 50;
-
-          it.print(x, y, id(font_medium), white, TextAlign::TOP_LEFT, "To cancel the reboot, push");
-          y += 25;
-
-          it.print(x, y, id(font_medium), white, TextAlign::TOP_LEFT, "the top-left button.");
-          y += 25;
+          it.image(160, 75, id(error_img), ImageAlign::CENTER);
+          sentinel_ui::draw_rounded_card(it, 20, 138, 280, 84, 8, card_bg, red);
+          it.print(160, 154, id(font_small), white, TextAlign::CENTER, "Touchscreen setup failed");
+          it.printf(160, 176, id(font_small), amber, TextAlign::CENTER, "Rebooting in %i seconds...", id(touchscreen_error_counter));
+          it.print(160, 198, id(font_badge), text_dim, TextAlign::CENTER, "Push top-left button to cancel");
